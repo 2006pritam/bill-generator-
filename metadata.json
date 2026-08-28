@@ -1,0 +1,6 @@
+{
+  "name": "Billing App",
+  "description": "Smart point of sale & billing app with barcode scanning, receipt printing, UPI payments, and product catalog management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
