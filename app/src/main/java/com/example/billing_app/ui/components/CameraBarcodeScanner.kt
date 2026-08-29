@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -139,7 +140,8 @@ fun CameraBarcodeScanner(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(230.dp)
+                        .fillMaxWidth(0.82f)
+                        .height(200.dp)
                         .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                 ) {
                     // Custom Scanner Corner Brackets

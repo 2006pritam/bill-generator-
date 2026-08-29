@@ -27,7 +27,8 @@ data class BillingUiState(
     val printSuccess: Boolean = false,
     val errorMessage: String? = null,
     val infoMessage: String? = null,
-    val lastScannedBarcode: String? = null
+    val lastScannedBarcode: String? = null,
+    val unregisteredBarcode: String? = null
 )
 
 class BillingViewModel(
@@ -41,27 +42,35 @@ class BillingViewModel(
     private var lastScannedCode = ""
 
     fun scanBarcode(barcode: String, onProductFound: (() -> Unit)? = null) {
+        val cleanBarcode = barcode.trim()
+        if (cleanBarcode.isEmpty()) return
+
         val now = System.currentTimeMillis()
-        if (barcode == lastScannedCode && (now - lastScanTime) < 1800) {
+        if (cleanBarcode == lastScannedCode && (now - lastScanTime) < 1800) {
             return // Cooldown to prevent duplicate fast scans
         }
         lastScanTime = now
-        lastScannedCode = barcode
+        lastScannedCode = cleanBarcode
 
         viewModelScope.launch {
-            val product = productRepository.getProductByBarcode(barcode)
+            val product = productRepository.getProductByBarcode(cleanBarcode)
             if (product != null) {
                 addProductToCart(product)
+                _uiState.update { it.copy(unregisteredBarcode = null) }
                 onProductFound?.invoke()
             } else {
                 _uiState.update {
                     it.copy(
-                        errorMessage = "Product not found for barcode: $barcode",
-                        lastScannedBarcode = barcode
+                        lastScannedBarcode = cleanBarcode,
+                        unregisteredBarcode = cleanBarcode
                     )
                 }
             }
         }
+    }
+
+    fun clearUnregisteredBarcode() {
+        _uiState.update { it.copy(unregisteredBarcode = null) }
     }
 
     fun addProductToCart(product: Product) {
@@ -216,6 +225,15 @@ class ProductViewModel(
         viewModelScope.launch {
             productRepository.deleteProduct(id)
             _message.value = "Product removed."
+        }
+    }
+
+    fun deleteAllProducts(onSuccess: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            productRepository.deleteAllProducts()
+            _searchQuery.value = ""
+            _message.value = "All products deleted. Ready for fresh data."
+            onSuccess?.invoke()
         }
     }
 

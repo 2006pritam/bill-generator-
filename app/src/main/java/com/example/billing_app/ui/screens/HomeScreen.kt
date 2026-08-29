@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +79,8 @@ import com.example.billing_app.ui.viewmodel.BillingViewModel
 fun HomeScreen(
     billingViewModel: BillingViewModel,
     onNavigateToCheckout: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToAddProductWithBarcode: (String) -> Unit = {}
 ) {
     val uiState by billingViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -396,6 +398,71 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { showManualInputDialog = false }) {
                     Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    // Unregistered Barcode Scanned Prompt Dialog
+    uiState.unregisteredBarcode?.let { unknownCode ->
+        AlertDialog(
+            onDismissRequest = { billingViewModel.clearUnregisteredBarcode() },
+            title = {
+                Text(
+                    text = "Product Not Found",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "This barcode is not registered in your inventory:",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PrimaryPurple.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryPurple.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = unknownCode,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = PrimaryPurple
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Would you like to add a new product with this barcode number?",
+                        fontSize = 13.sp,
+                        color = TextPrimary
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val codeToAdd = unknownCode
+                        billingViewModel.clearUnregisteredBarcode()
+                        onNavigateToAddProductWithBarcode(codeToAdd)
+                    },
+                    modifier = Modifier.testTag("add_scanned_product_button")
+                ) {
+                    Text("Add Product", fontWeight = FontWeight.Bold, color = PrimaryPurple)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { billingViewModel.clearUnregisteredBarcode() },
+                    modifier = Modifier.testTag("dismiss_unregistered_barcode_button")
+                ) {
+                    Text("Dismiss", color = TextSecondary)
                 }
             }
         )

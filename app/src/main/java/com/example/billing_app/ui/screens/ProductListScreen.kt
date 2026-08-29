@@ -19,11 +19,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -52,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,7 +75,7 @@ import com.example.billing_app.ui.viewmodel.ProductViewModel
 @Composable
 fun ProductListScreen(
     productViewModel: ProductViewModel,
-    onNavigateToAddProduct: () -> Unit,
+    onNavigateToAddProduct: (String?) -> Unit,
     onNavigateToEditProduct: (Product) -> Unit,
     onOpenScanner: () -> Unit,
     onNavigateBack: () -> Unit
@@ -78,6 +83,7 @@ fun ProductListScreen(
     val uiState by productViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var productToDelete by remember { mutableStateOf<Product?>(null) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let { msg ->
@@ -118,6 +124,20 @@ fun ProductListScreen(
                         )
                     }
                 },
+                actions = {
+                    if (uiState.products.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showDeleteAllDialog = true },
+                            modifier = Modifier.testTag("delete_all_products_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DeleteForever,
+                                contentDescription = "Delete All Products",
+                                tint = ErrorRed
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color(0xFFF8FAFC)
                 )
@@ -125,7 +145,7 @@ fun ProductListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNavigateToAddProduct,
+                onClick = { onNavigateToAddProduct(null) },
                 containerColor = PrimaryPurple,
                 contentColor = Color.White,
                 shape = CircleShape,
@@ -185,14 +205,31 @@ fun ProductListScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Tap the scanner icon to find items with the camera",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFF4C669A),
-                        fontSize = 11.sp
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (uiState.products.isNotEmpty()) "${uiState.products.size} Products in Catalog" else "Clean Inventory (0 items)",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = PrimaryPurple,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
                     )
-                )
+
+                    if (uiState.products.isNotEmpty()) {
+                        Text(
+                            text = "Tap 🗑 to clear all",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = ErrorRed,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+                }
             }
 
             // Product List
@@ -208,21 +245,50 @@ fun ProductListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            shape = CircleShape,
+                            color = PrimaryPurple.copy(alpha = 0.08f),
+                            modifier = Modifier.size(84.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Inventory2,
+                                    contentDescription = null,
+                                    tint = PrimaryPurple,
+                                    modifier = Modifier.size(42.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (uiState.searchQuery.isBlank()) "No products in catalog" else "No matching products found",
+                            text = if (uiState.searchQuery.isBlank()) "No Products in Catalog" else "No matching products found",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimary
+                                color = TextPrimary,
+                                fontSize = 18.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (uiState.searchQuery.isBlank()) "Tap + button below to add your first product." else "Try searching with a different name or barcode.",
+                            text = if (uiState.searchQuery.isBlank()) "Catalog is clean. Ready to add only your fresh products." else "Try searching with a different name or barcode.",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = TextSecondary,
-                                fontSize = 13.sp
-                            )
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            ),
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = { onNavigateToAddProduct(if (uiState.searchQuery.isNotBlank()) uiState.searchQuery else null) },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("add_fresh_product_button")
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (uiState.searchQuery.isBlank()) "Add Fresh Product" else "Add as New Product", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             } else {
@@ -247,7 +313,56 @@ fun ProductListScreen(
         }
     }
 
-    // Delete Confirmation Dialog
+    // Delete All Confirmation Dialog
+    if (showDeleteAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAllDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.DeleteForever,
+                    contentDescription = null,
+                    tint = ErrorRed,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete All Products?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "This will permanently remove all ${uiState.products.size} products from your catalog so you can start with a fresh inventory. This cannot be undone.",
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        productViewModel.deleteAllProducts {
+                            showDeleteAllDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                    modifier = Modifier.testTag("confirm_delete_all_button")
+                ) {
+                    Text("Delete All Data", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAllDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    // Single Item Delete Confirmation Dialog
     productToDelete?.let { product ->
         AlertDialog(
             onDismissRequest = { productToDelete = null },

@@ -21,9 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -38,11 +39,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,6 +72,9 @@ import com.example.billing_app.util.PrinterHelper
 import com.example.billing_app.util.QrCodeGenerator
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +87,9 @@ fun CheckoutScreen(
     val shop by shopViewModel.shop.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var showInvoicePreview by remember { mutableStateOf(false) }
+    val currentInvoiceNo = remember { PrinterHelper.generateInvoiceNumber() }
+    val currentDateStr = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date()) }
 
     BackHandler {
         billingViewModel.clearCart()
@@ -87,7 +98,7 @@ fun CheckoutScreen(
 
     LaunchedEffect(billingState.printSuccess) {
         if (billingState.printSuccess) {
-            snackbarHostState.showSnackbar("Receipt printed successfully!")
+            snackbarHostState.showSnackbar("Computer Bill generated & printed successfully!")
         }
     }
 
@@ -138,14 +149,15 @@ fun CheckoutScreen(
                             val receiptText = PrinterHelper.generateReceiptText(
                                 shop = shop,
                                 items = billingState.cartItems,
-                                totalAmount = billingState.totalAmount
+                                totalAmount = billingState.totalAmount,
+                                invoiceNo = currentInvoiceNo
                             )
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
                                 putExtra(Intent.EXTRA_TEXT, receiptText)
                                 type = "text/plain"
                             }
-                            context.startActivity(Intent.createChooser(sendIntent, "Share Receipt"))
+                            context.startActivity(Intent.createChooser(sendIntent, "Share Computer Bill"))
                         },
                         modifier = Modifier.testTag("share_receipt_button")
                     ) {
@@ -196,15 +208,42 @@ fun CheckoutScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    PrimaryButton(
-                        text = if (billingState.isPrinting) "Printing..." else "Print Receipt",
-                        icon = Icons.Filled.Print,
-                        isLoading = billingState.isPrinting,
-                        onClick = {
-                            billingViewModel.printReceipt(shop)
-                        },
-                        testTag = "print_receipt_button"
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showInvoicePreview = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                                .testTag("preview_bill_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryPurple)
+                        ) {
+                            Icon(Icons.Filled.Description, contentDescription = null, tint = PrimaryPurple, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("View Bill", color = PrimaryPurple, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+
+                        PrimaryButton(
+                            text = if (billingState.isPrinting) "Printing..." else "Print Bill (PDF)",
+                            icon = Icons.Filled.Print,
+                            isLoading = billingState.isPrinting,
+                            modifier = Modifier.weight(1.3f),
+                            onClick = {
+                                PrinterHelper.printComputerBill(
+                                    context = context,
+                                    shop = shop,
+                                    items = billingState.cartItems,
+                                    totalAmount = billingState.totalAmount,
+                                    invoiceNo = currentInvoiceNo
+                                )
+                                billingViewModel.printReceipt(shop)
+                            },
+                            testTag = "print_receipt_button"
+                        )
+                    }
                 }
             }
         }
@@ -218,6 +257,51 @@ fun CheckoutScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Invoice Metadata Header
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = PrimaryPurple.copy(alpha = 0.07f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "COMPUTER BILL NO.",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryPurple,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = currentInvoiceNo,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimary
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = PrimaryPurple,
+                        contentColor = Color.White
+                    ) {
+                        Text(
+                            text = "READY",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
             // Itemized Bill Table Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -373,5 +457,107 @@ fun CheckoutScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Computer Bill Preview Dialog
+    if (showInvoicePreview) {
+        AlertDialog(
+            onDismissRequest = { showInvoicePreview = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Computer Generated Bill",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = TextPrimary
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(text = shop.name, fontWeight = FontWeight.Black, fontSize = 20.sp, color = PrimaryPurple)
+                    if (shop.addressLine1.isNotBlank()) Text(text = shop.addressLine1, fontSize = 12.sp, color = TextSecondary)
+                    if (shop.phoneNumber.isNotBlank()) Text(text = "Tel: ${shop.phoneNumber}", fontSize = 12.sp, color = TextSecondary)
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Invoice: $currentInvoiceNo", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = currentDateStr, fontSize = 11.sp, color = TextSecondary)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    billingState.cartItems.forEachIndexed { idx, itm ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "${idx + 1}. ${itm.product.name} (x${itm.quantity})", fontSize = 13.sp, color = TextPrimary, modifier = Modifier.weight(2f))
+                            Text(text = "₹${String.format("%.2f", itm.total)}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(thickness = 1.5.dp, color = PrimaryPurple)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Grand Total:", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(text = "₹${String.format("%.2f", billingState.totalAmount)}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PrimaryPurple)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFFF1F5F9),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "*** Official Computer Generated Bill - Valid for All Transactions ***",
+                            fontSize = 10.sp,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        PrinterHelper.printComputerBill(
+                            context = context,
+                            shop = shop,
+                            items = billingState.cartItems,
+                            totalAmount = billingState.totalAmount,
+                            invoiceNo = currentInvoiceNo
+                        )
+                        showInvoicePreview = false
+                    }
+                ) {
+                    Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Print / Save PDF", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInvoicePreview = false }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 }

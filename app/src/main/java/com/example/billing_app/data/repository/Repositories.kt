@@ -45,18 +45,12 @@ class ProductRepository(private val productDao: ProductDao) {
         productDao.deleteProductById(id)
     }
 
+    suspend fun deleteAllProducts() {
+        productDao.deleteAllProducts()
+    }
+
     suspend fun seedInitialProductsIfEmpty() {
-        val initialList = listOf(
-            Product(id = UUID.randomUUID().toString(), name = "Basmati Rice 1kg", barcode = "8901030383424", price = 120.0, stock = 50),
-            Product(id = UUID.randomUUID().toString(), name = "Sunflower Cooking Oil 1L", barcode = "8901491101834", price = 145.0, stock = 30),
-            Product(id = UUID.randomUUID().toString(), name = "Tata Salt 1kg", barcode = "8901725181222", price = 28.0, stock = 100),
-            Product(id = UUID.randomUUID().toString(), name = "Whole Wheat Atta 5kg", barcode = "8901058852445", price = 240.0, stock = 25),
-            Product(id = UUID.randomUUID().toString(), name = "Masala Tea 500g", barcode = "8901030895415", price = 190.0, stock = 40),
-            Product(id = UUID.randomUUID().toString(), name = "Organic Turmeric Powder 200g", barcode = "8901234567890", price = 65.0, stock = 45),
-            Product(id = UUID.randomUUID().toString(), name = "Dairy Milk Silk Chocolate", barcode = "7622201446759", price = 85.0, stock = 60),
-            Product(id = UUID.randomUUID().toString(), name = "Cold Pressed Coconut Oil 500ml", barcode = "8902579123456", price = 180.0, stock = 20)
-        )
-        productDao.insertInitialProducts(initialList.map { ProductEntity.fromDomain(it) })
+        // No automatic old/dummy products seeding - keep catalog clean for fresh user data only
     }
 }
 

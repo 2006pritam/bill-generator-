@@ -1,7 +1,9 @@
 package com.example.billing_app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,11 +28,16 @@ object Destinations {
     const val CHECKOUT = "checkout"
     const val PRODUCT_LIST = "product_list"
     const val ADD_PRODUCT = "add_product"
+    const val ADD_PRODUCT_ROUTE = "add_product?barcode={barcode}"
     const val EDIT_PRODUCT = "edit_product/{productId}"
     const val SHOP_DETAILS = "shop_details"
     const val SETTINGS = "settings"
     const val SCANNER_FOR_SEARCH = "scanner_search"
     const val SCANNER_FOR_ADD = "scanner_add"
+
+    fun addProduct(barcode: String? = null): String {
+        return if (!barcode.isNullOrBlank()) "add_product?barcode=$barcode" else "add_product"
+    }
 }
 
 @Composable
@@ -53,6 +60,9 @@ fun AppNavigation(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Destinations.SETTINGS)
+                },
+                onNavigateToAddProductWithBarcode = { barcode ->
+                    navController.navigate(Destinations.addProduct(barcode))
                 }
             )
         }
@@ -86,8 +96,8 @@ fun AppNavigation(
         composable(Destinations.PRODUCT_LIST) {
             ProductListScreen(
                 productViewModel = productViewModel,
-                onNavigateToAddProduct = {
-                    navController.navigate(Destinations.ADD_PRODUCT)
+                onNavigateToAddProduct = { barcode ->
+                    navController.navigate(Destinations.addProduct(barcode))
                 },
                 onNavigateToEditProduct = { product ->
                     navController.navigate("edit_product/${product.id}")
@@ -101,12 +111,27 @@ fun AppNavigation(
             )
         }
 
-        composable(Destinations.ADD_PRODUCT) { backStackEntry ->
-            val scannedBarcode = backStackEntry.savedStateHandle.get<String>("scanned_barcode")
+        composable(
+            route = Destinations.ADD_PRODUCT_ROUTE,
+            arguments = listOf(
+                navArgument("barcode") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val argBarcode = backStackEntry.arguments?.getString("barcode")
+            val liveScannedBarcode by backStackEntry.savedStateHandle
+                .getStateFlow<String?>("scanned_barcode", null)
+                .collectAsStateWithLifecycle()
+
+            val effectiveBarcode = liveScannedBarcode ?: argBarcode
+
             AddEditProductScreen(
                 productViewModel = productViewModel,
                 existingProduct = null,
-                scannedBarcode = scannedBarcode,
+                scannedBarcode = effectiveBarcode,
                 onOpenScanner = {
                     navController.navigate(Destinations.SCANNER_FOR_ADD)
                 },
@@ -173,3 +198,4 @@ fun AppNavigation(
         }
     }
 }
+
